@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+enum Align { LEFT, CENTER, RIGHT };
+
 class Box {
 public:
   Box(std::string msg, int limit = 40) : msg(Box::clean(msg)), limit(limit) {
@@ -13,8 +15,11 @@ public:
   void Chunks() {
     std::string msgCopy = this->msg;
     int limit = this->limit;
+    len = msgCopy.size();
 
     while (msgCopy.length() > limit) {
+      if (len != this->limit)
+        len = this->limit;
       std::string chunk = msgCopy.substr(0, limit);
       if (msgCopy[limit + 1] != '\n' || msgCopy[limit + 1] != ' ') {
         int idx = msgCopy.find_last_of(" ", limit);
@@ -23,11 +28,11 @@ public:
           limit = idx;
         }
       }
-      this->chunks.push_back(Box::clean(chunk));
+      pushChunk(chunk);
       msgCopy = msgCopy.substr(limit);
       limit = this->limit;
     }
-    this->chunks.push_back(Box::clean(msgCopy));
+    pushChunk(msgCopy);
   }
 
   friend std::ostream &operator<<(std::ostream &, Box &);
@@ -38,10 +43,38 @@ public:
     return s;
   }
 
+  static std::string padding(std::string s, int len, enum Align align) {
+    int to_pad = len - s.length();
+    if (to_pad <= 0)
+      return s;
+
+    if (align == Align::LEFT) {
+      while (to_pad-- != 0) {
+        s += " ";
+      }
+    }
+
+    return s;
+  }
+
 protected:
   int limit = 40;
+  int len;
   std::string msg;
   std::vector<std::string> chunks;
+
+  // handles \n, but what bout \t? (Sigh..)
+  void pushChunk(std::string &chunk) {
+    while (chunk.find("\n") != std::string::npos) {
+      int idx = chunk.find("\n");
+      std::string chunk_part = chunk.substr(0, idx);
+      this->chunks.push_back(Box::clean(chunk_part));
+      chunk = chunk.substr(idx + 1);
+    }
+    if (chunk != "\0") {
+      this->chunks.push_back(Box::clean(chunk));
+    }
+  }
 };
 
 class BoxChar {
@@ -69,18 +102,19 @@ std::string operator*(BoxChar &bc, unsigned int len) {
 }
 
 namespace BoxOutline {
-inline static BoxChar HorizontalSingle = BoxChar((char *)"─");
-inline static BoxChar VerticalSingle = BoxChar((char *)"│");
-inline static BoxChar TopLeftCornerSingle = BoxChar((char *)"┌");
-inline static BoxChar TopRightCornerSingle = BoxChar((char *)"┐");
-inline static BoxChar BottomLeftCornerSingle = BoxChar((char *)"└");
-inline static BoxChar BottomRightCornerSingle = BoxChar((char *)"┘");
+BoxChar HorizontalSingle = BoxChar((char *)"─");
+BoxChar VerticalSingle = BoxChar((char *)"│");
+BoxChar TopLeftCornerSingle = BoxChar((char *)"┌");
+BoxChar TopRightCornerSingle = BoxChar((char *)"┐");
+BoxChar BottomLeftCornerSingle = BoxChar((char *)"└");
+BoxChar BottomRightCornerSingle = BoxChar((char *)"┘");
 
-inline static BoxChar EmptyChar = BoxChar((char *)" ");
+BoxChar EmptyChar = BoxChar((char *)" ");
 }; // namespace BoxOutline
 
 std::ostream &operator<<(std::ostream &os, Box &box) {
-  int width = (box.limit + 2);
+  int rawWidth = box.len;
+  int width = (box.len + 2);
   int height = box.chunks.size();
 
   // clang-format off
@@ -88,22 +122,17 @@ std::ostream &operator<<(std::ostream &os, Box &box) {
      << (BoxOutline::HorizontalSingle * width)
      << BoxOutline::TopRightCornerSingle
      << '\n';
-  for (int i = 0; i < height; i++) {
-    os << BoxOutline::VerticalSingle << BoxOutline::EmptyChar * width
-       << BoxOutline::VerticalSingle << "\n";
+  for (auto &chunk : box.chunks) {
+    os << BoxOutline::VerticalSingle << BoxOutline::EmptyChar
+       << Box::padding(chunk, rawWidth, Align::LEFT)
+       << BoxOutline::EmptyChar << BoxOutline::VerticalSingle
+       << "\n";
   }
   os << BoxOutline::BottomLeftCornerSingle
      << (BoxOutline::HorizontalSingle * width)
      << BoxOutline::BottomRightCornerSingle
      << '\n';
   // clang-format on
-
-  os << "\033[" << height + 1 << "A";
-
-  for (auto &chunk : box.chunks) {
-    os << "\033[2C" << chunk << "\n";
-  }
-  os << "\n";
   return os;
 }
 
