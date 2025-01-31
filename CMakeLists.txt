@@ -5,6 +5,8 @@ project(
   LANGUAGES CXX
   VERSION 0.6.9)
 
+include_directories(include/)
+
 file(GLOB SOURCES src/*.cpp)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
