@@ -2,53 +2,56 @@
 
 #include <iostream>
 #include <string>
+#include <unordered_map>
 
-struct Flags {
-  bool f = false;
-  std::string file = "";
+typedef struct Flags {
+  std::string* modifier = nullptr;
+  std::unordered_map<std::string, std::string> flags_str;
+  std::unordered_map<std::string, bool> flags_bool;
+} Flags;
 
-  bool b = false;
-  std::string borderStyle = "";
-};
+Flags& initialiseFlags(Flags& flags) {
+  flags.flags_str["-f"] = "";
+  flags.flags_str["-b"] = "";
 
-std::string* isFlag(struct Flags& f) {
-  std::string* setFlag = nullptr;
-  setFlag = f.f ? &f.file : setFlag;
-  f.f = false;
-  setFlag = f.b ? &f.borderStyle : setFlag;
-  f.b = false;
+  flags.flags_bool["--border-double"] = false;
 
-  return setFlag;
+  flags.modifier = nullptr;
+
+  return flags;
 }
 
 void flagCheck(Flags& flags, char* arg) {
-  char* c = arg;
-  while (*(c++) != '\0') {
-    if (*c == 'f')
-      flags.f = true;
-    else if (*c == 'b')
-      flags.b = true;
+  if (flags.flags_str.find(arg) != flags.flags_str.end()) {
+    flags.modifier = &flags.flags_str[arg];
+    return;
   }
+  if (flags.flags_bool.find(arg) != flags.flags_bool.end()) {
+    flags.flags_bool[arg] = true;
+    return;
+  }
+  std::cerr << "Unidentified Flag " << arg << "\n";
+  exit(1);
 }
 
 int main(int argc, char** argv) {
   std::string msg = "";
-  bool msgReading = false;
-  struct Flags flags;
+  bool readingMsg = false;
+  Flags flags;
 
+  initialiseFlags(flags);
   for (int i = 1; i < argc; i++) {
-    if (!msgReading) {
-      if (argv[i][0] == '-') {
-        flagCheck(flags, argv[i]);
-        continue;
-      }
-
-      std::string* modifier = isFlag(flags);
-      if (modifier) {
-        *modifier = std::string(argv[i]);
-        continue;
-      }
+    if (!readingMsg && argv[i][0] == '-') {
+      flagCheck(flags, argv[i]);
+      continue;
     }
+    if (!readingMsg && flags.modifier) {
+      *flags.modifier = std::string(argv[i]);
+      flags.modifier = nullptr;
+      continue;
+    }
+
+    readingMsg = true;
     msg += argv[i];
     msg += " ";
   }
