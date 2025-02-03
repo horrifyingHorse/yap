@@ -58,6 +58,9 @@ int main(int argc, char** argv) {
 
   Box display(msg);
 
+  if (flags.flags_bool["--border-double"])
+    display.setBorder(Border::DOUBLE);
+
   std::cout << display;
 
   return 0;
